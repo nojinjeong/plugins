@@ -318,7 +318,7 @@ class TizenNotificationPlugin : public flutter::Plugin {
           }
         }
 
-        if (GetEncodableValueFromArgs(arguments, "appControlData",
+        if (GetEncodableValueFromArgs(arguments, "appControl",
                                       app_control_data)) {
           std::string app_id;
           if (GetValueFromArgs(&app_control_data, "appId", app_id)) {
@@ -326,7 +326,7 @@ class TizenNotificationPlugin : public flutter::Plugin {
             std::string uri;
             std::string category;
             std::string mime;
-            flutter::EncodableList extras;
+            flutter::EncodableMap extras;
             std::string key;
             ret = app_control_create(&app_control);
             if (ret != APP_CONTROL_ERROR_NONE) {
@@ -403,109 +403,113 @@ class TizenNotificationPlugin : public flutter::Plugin {
             }
 
             if (GetValueFromArgs(&app_control_data, "extraData", extras)) {
-              for (size_t i = 0; i < extras.size(); i++) {
-                std::string key;
+              for (auto extra = extras.begin(); extra != extras.end();
+                   extra++) {
                 flutter::EncodableList value_list;
-                if (GetValueFromArgs(&extras[i], "key", key)) {
-                  std::vector<const char *> values;
-                  std::vector<std::string> dummy;
-                  if (GetValueFromArgs(&extras[i], "values", value_list)) {
-                    for (size_t i = 0; i < value_list.size(); i++) {
-                      dummy.push_back(std::get<std::string>(value_list[i]));
-                    }
-                    for (size_t i = 0; i < value_list.size(); i++) {
-                      values.push_back(dummy[i].c_str());
-                    }
+                std::vector<const char *> values;
+                std::vector<std::string> dummy;
+                std::string value;
+                if (GetValueFromArgs(&extras, extra->first, value_list)) {
+                  for (size_t i = 0; i < value_list.size(); i++) {
+                    dummy.push_back(std::get<std::string>(value_list[i]));
+                  }
+                  for (size_t i = 0; i < value_list.size(); i++) {
+                    values.push_back(dummy[i].c_str());
                   }
                   app_control_add_extra_data_array(
-                      app_control, key.c_str(), values.data(), values.size());
+                      app_control, extra->first.c_str(), values.data(),
+                      values.size());
+                } else if (GetValueFromArgs(&extras, extra->first.c_str(),
+                                            value)) {
+                  app_control_add_extra_data(app_control, extra->first.c_str(),
+                                             value.c_str());
                 }
               }
             }
-            ret = notification_set_launch_option(
-                noti_handle, NOTIFICATION_LAUNCH_OPTION_APP_CONTROL,
-                (void *)app_control);
-            if (ret != NOTIFICATION_ERROR_NONE) {
-              FreeNotification(noti_handle);
-              DestroyAppControl(app_control);
-              LOG_ERROR("notification_set_launch_option failed : %s",
-                        get_error_message(ret));
-              result->Error("notification_set_launch_option failed",
-                            std::string(get_error_message(ret)));
-              return;
-            }
           }
-        }
-
-        if (app_control) {
-          ret = app_control_destroy(app_control);
-          if (ret != APP_CONTROL_ERROR_NONE) {
-            FreeNotification(noti_handle);
-            LOG_ERROR("app_control_destroy failed : %s",
-                      get_error_message(ret));
-            result->Error("app_control_destroy failed",
-                          std::string(get_error_message(ret)));
-            return;
-          }
-        }
-        ret = notification_post(noti_handle);
-        if (ret != NOTIFICATION_ERROR_NONE) {
-          FreeNotification(noti_handle);
-          LOG_ERROR("notification_post failed : %s", get_error_message(ret));
-          result->Error("notification_post failed",
-                        std::string(get_error_message(ret)));
-          return;
-        }
-        ret = notification_free(noti_handle);
-        if (ret != NOTIFICATION_ERROR_NONE) {
-          LOG_ERROR("notification_free failed : %s", get_error_message(ret));
-          result->Error("notification_free failed",
-                        std::string(get_error_message(ret)));
-          return;
-        }
-        result->Success();
-      }
-    } else if (method_call.method_name().compare("cancel") == 0) {
-      const flutter::EncodableValue *arguments = method_call.arguments();
-      if (arguments != nullptr &&
-          std::holds_alternative<std::string>(*arguments)) {
-        std::string id = std::get<std::string>(*arguments);
-        notification_h notification = nullptr;
-        notification = notification_load_by_tag(id.c_str());
-        if (notification != nullptr) {
-          int ret = notification_delete(notification);
+          ret = notification_set_launch_option(
+              noti_handle, NOTIFICATION_LAUNCH_OPTION_APP_CONTROL,
+              (void *)app_control);
           if (ret != NOTIFICATION_ERROR_NONE) {
-            LOG_ERROR("notification_delete failed : %s",
+            FreeNotification(noti_handle);
+            DestroyAppControl(app_control);
+            LOG_ERROR("notification_set_launch_option failed : %s",
                       get_error_message(ret));
-            result->Error("notification_delete failed",
+            result->Error("notification_set_launch_option failed",
                           std::string(get_error_message(ret)));
             return;
           }
         }
-        result->Success();
       }
-    } else if (method_call.method_name().compare("cancelAll") == 0) {
-      int ret = NOTIFICATION_ERROR_NONE;
-      ret = notification_delete_all(NOTIFICATION_TYPE_NOTI);
+
+      if (app_control) {
+        ret = app_control_destroy(app_control);
+        if (ret != APP_CONTROL_ERROR_NONE) {
+          FreeNotification(noti_handle);
+          LOG_ERROR("app_control_destroy failed : %s", get_error_message(ret));
+          result->Error("app_control_destroy failed",
+                        std::string(get_error_message(ret)));
+          return;
+        }
+      }
+      ret = notification_post(noti_handle);
       if (ret != NOTIFICATION_ERROR_NONE) {
-        LOG_ERROR("notification_delete_all failed : %s",
-                  get_error_message(ret));
-        result->Error("notification_delete_all failed",
+        FreeNotification(noti_handle);
+        LOG_ERROR("notification_post failed : %s", get_error_message(ret));
+        result->Error("notification_post failed",
                       std::string(get_error_message(ret)));
         return;
       }
-      ret = notification_delete_all(NOTIFICATION_TYPE_ONGOING);
+      ret = notification_free(noti_handle);
       if (ret != NOTIFICATION_ERROR_NONE) {
-        LOG_ERROR("notification_delete_all failed : %s",
-                  get_error_message(ret));
-        result->Error("notification_delete_all failed",
+        LOG_ERROR("notification_free failed : %s", get_error_message(ret));
+        result->Error("notification_free failed",
                       std::string(get_error_message(ret)));
         return;
       }
       result->Success();
     }
   }
-};
+  else if (method_call.method_name().compare("cancel") == 0) {
+    const flutter::EncodableValue *arguments = method_call.arguments();
+    if (arguments != nullptr &&
+        std::holds_alternative<std::string>(*arguments)) {
+      std::string id = std::get<std::string>(*arguments);
+      notification_h notification = nullptr;
+      notification = notification_load_by_tag(id.c_str());
+      if (notification != nullptr) {
+        int ret = notification_delete(notification);
+        if (ret != NOTIFICATION_ERROR_NONE) {
+          LOG_ERROR("notification_delete failed : %s", get_error_message(ret));
+          result->Error("notification_delete failed",
+                        std::string(get_error_message(ret)));
+          return;
+        }
+      }
+      result->Success();
+    }
+  }
+  else if (method_call.method_name().compare("cancelAll") == 0) {
+    int ret = NOTIFICATION_ERROR_NONE;
+    ret = notification_delete_all(NOTIFICATION_TYPE_NOTI);
+    if (ret != NOTIFICATION_ERROR_NONE) {
+      LOG_ERROR("notification_delete_all failed : %s", get_error_message(ret));
+      result->Error("notification_delete_all failed",
+                    std::string(get_error_message(ret)));
+      return;
+    }
+    ret = notification_delete_all(NOTIFICATION_TYPE_ONGOING);
+    if (ret != NOTIFICATION_ERROR_NONE) {
+      LOG_ERROR("notification_delete_all failed : %s", get_error_message(ret));
+      result->Error("notification_delete_all failed",
+                    std::string(get_error_message(ret)));
+      return;
+    }
+    result->Success();
+  }
+}
+}
+;
 
 void TizenNotificationPluginRegisterWithRegistrar(
     FlutterDesktopPluginRegistrarRef registrar) {

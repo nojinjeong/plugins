@@ -18,12 +18,15 @@ class NotificationTest extends StatelessWidget {
       properties: Property.disableAutoDelete,
       vibration: NotificationVibration(type: VibrationType.builtIn),
       sound: NotificationSound(type: SoundType.builtIn),
+      appControl: AppControl(
+        appId: 'com.example.sample_app',
+      ),
     );
     await _tizenNotificationPlugin.show(
       notificationId,
-      'show Notification Title',
-      'show Notification Body',
-      details,
+      title: 'show Notification Title',
+      body: 'show Notification Body',
+      notificationDetails: details,
     );
   }
 
@@ -31,7 +34,7 @@ class NotificationTest extends StatelessWidget {
     await _tizenNotificationPlugin.cancel(notificationId);
   }
 
-  Future<void> _cancelAllNotification() async {
+  Future<void> _cancelAllNotifications() async {
     await _tizenNotificationPlugin.cancelAll();
   }
 
@@ -43,15 +46,15 @@ class NotificationTest extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             ElevatedButton(
-              child: const Text('show Notification'),
+              child: const Text('Show notification'),
               onPressed: _showNotification,
             ),
             ElevatedButton(
-                child: const Text('cancel Notification'),
+                child: const Text('Cancel notification'),
                 onPressed: _cancelNotification),
             ElevatedButton(
-                child: const Text('cancelAll Notification'),
-                onPressed: _cancelAllNotification),
+                child: const Text('Cancel all notifications'),
+                onPressed: _cancelAllNotifications),
           ],
         ),
       ),

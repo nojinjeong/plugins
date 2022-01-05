@@ -1,6 +1,9 @@
 import 'package:flutter/services.dart';
+import 'package:tizen_app_control/app_control.dart';
 
 import 'src/types.dart';
+
+export 'package:tizen_app_control/app_control.dart';
 
 export 'src/enums.dart';
 export 'src/types.dart';
@@ -14,7 +17,7 @@ class TizenNotificationDetails {
   const TizenNotificationDetails({
     this.images,
     this.properties,
-    this.appControlData,
+    this.appControl,
     this.vibration,
     this.sound,
     this.displayApplist = DisplayApplist.all,
@@ -34,7 +37,7 @@ class TizenNotificationDetails {
   final int? properties;
 
   /// A set of information used by app control to launch other applications.
-  final AppControlData? appControlData;
+  final AppControl? appControl;
 
   /// The vibration triggered when a notification is shown on the panel.
   final NotificationVibration? vibration;
@@ -63,8 +66,14 @@ class TizenNotificationDetails {
         'images': _getImages(images)
             ?.map((NotificationImage image) => image.toMap())
             .toList(),
-        'appControlData': appControlData?.toMap(),
         'onGoing': onGoing,
+        'appControl': <String, dynamic>{
+          'appId': appControl?.appId,
+          'operation': appControl?.operation,
+          'uri': appControl?.uri,
+          'mime': appControl?.mime,
+          'extraData': appControl?.extraData,
+        },
       };
 
   List<NotificationImage>? _getImages(dynamic image) {
@@ -99,11 +108,11 @@ class TizenNotificationPlugin {
   /// of the notification which can later be passed to [cancel] to erase the
   /// notification.
   Future<void> show(
-    int id,
+    int id, {
     String? title,
     String? body,
     TizenNotificationDetails? notificationDetails,
-  ) {
+  }) {
     final Map<String, dynamic> details =
         notificationDetails?.toMap() ?? <String, dynamic>{};
     details['id'] = id.toString();
